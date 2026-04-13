@@ -252,7 +252,7 @@ The `.openclaw` directory uses an overlay pattern:
 
 Both have identical directory structure. Writes go to `.openclaw-data/`, reads fall through to `.openclaw/`. For backup/restore, always target `.openclaw-data/`.
 
-**CRITICAL: The overlay is ephemeral.** Every pod restart (reboot, crash, `openshell gateway start`) wipes `/sandbox/.openclaw-data/` back to image defaults. All workspace files, custom skills, cron jobs, sessions, and memory notes are lost. This is NVIDIA/NemoClaw#486 — no upstream fix as of April 2026. Automated watchdog restore is mandatory for always-on deployments. See `references/workspace-backup.md`.
+**CRITICAL: The overlay is ephemeral.** Every pod restart (reboot, crash, `openshell gateway start`) wipes `/sandbox/.openclaw-data/` back to image defaults. All workspace files, custom skills, cron jobs, sessions, and memory notes are lost. No upstream PVC support exists as of April 2026. Note: the SSH secret mismatch (NemoClaw#486) is fixed in #1587, but that only prevents the secret regeneration — overlay wipe is a separate issue. Automated watchdog restore is mandatory for always-on deployments. See `references/workspace-backup.md`.
 
 ## Requirements
 

@@ -208,6 +208,18 @@ If a custom skill has the same name as a bundled one, remove the bundled from `a
 
 The agent may output raw tool results AND then rephrase them. Add to SOUL.md: "NEVER send two messages for one question."
 
+### 7. TOOLS.md shapes agent behavior (SKILL.md rule #14.6)
+
+The agent copies examples from TOOLS.md verbatim. If TOOLS.md shows entity IDs, the agent uses entity IDs in its commands. If it shows friendly names, the agent uses friendly names. Always format TOOLS.md the way you want the agent to produce output.
+
+### 8. Never put API tokens in workspace .md files (SKILL.md rule #14.7)
+
+Helper scripts handle authentication internally. Bare tokens in TOOLS.md or SKILL.md get copied into curl commands by the agent, causing auth failures when it copies them incorrectly or truncates them.
+
+### 9. All workspace files must be consistent (SKILL.md rule #14.8)
+
+SOUL.md, TOOLS.md, and SKILL.md must all point to the same scripts and use the same terminology. If SOUL.md says "use ha-control.sh with friendly names" but TOOLS.md shows entity IDs, the agent picks whichever seems familiar and fails.
+
 ## Common Custom Skills
 
 | Skill | Pattern | What it does |
