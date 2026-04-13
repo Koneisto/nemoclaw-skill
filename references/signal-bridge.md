@@ -196,7 +196,18 @@ fi
 
 If the bridge crashes, the Node.js process may linger. Multiple instances cause **duplicate messages** (each instance has its own WebSocket to signal-cli, so each processes the same incoming message independently).
 
-The watchdog handles this by killing orphans before starting a new instance (see above). The PID file alone isn't sufficient — check for orphans with `pgrep -f "node scripts/signal-bridge.js"`.
+The watchdog handles this by killing orphans before starting a new instance (see above). The PID file alone isn't sufficient.
+
+**Important (SKILL.md rule #17):** `pgrep -f "signal-bridge.js"` matches ANY process whose command line contains that string — including Claude Code or other diagnostic sessions. Filter by `/proc/PID/comm` to verify it's actually node:
+
+```bash
+for pid in $(pgrep -f "signal-bridge.js" 2>/dev/null); do
+    comm=$(cat "/proc/$pid/comm" 2>/dev/null || true)
+    if [[ "$comm" == node* ]]; then
+        echo "$pid"  # Real bridge — safe to manage
+    fi
+done
+```
 
 ### Log Rotation
 

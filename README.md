@@ -1,6 +1,6 @@
-# NemoClaw Skill for Claude Code
+![NemoClaw Skill](social-preview.png)
 
-A comprehensive Claude Code skill for managing [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw) sandboxed AI agents from the host side.
+A comprehensive [Claude Code](https://claude.ai/code) skill for managing [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw) sandboxed AI agents from the host side.
 
 ## Why This Skill Exists
 
@@ -79,7 +79,7 @@ These files live on the **overlay filesystem** and are wiped on every pod restar
 
 ## Key Knowledge
 
-SKILL.md contains **21 critical operational rules** learned from production failures. The most important:
+SKILL.md contains **24 critical operational rules** learned from production failures. The most important:
 
 - **Rule #1**: Use preset system for network policies, not raw `openshell policy set`
 - **Rule #3**: SSH for file transfer — `openshell upload/download` creates wrapper directories
@@ -87,14 +87,14 @@ SKILL.md contains **21 critical operational rules** learned from production fail
 - **Rule #10**: Clear sessions AFTER workspace restore — agent caches stale system prompts
 - **Rule #14**: Native skills (exec + curl/python3) preferred over MCP bridges
 
-See SKILL.md for all 21 rules with full explanations.
+See SKILL.md for all 24 rules with full explanations.
 
 ## Known Upstream Issues
 
 | Issue | Title | Skill Workaround |
 |-------|-------|-----------------|
-| [#486](https://github.com/NVIDIA/NemoClaw/issues/486) | Sandbox not available after restart | Automated watchdog restore pattern |
-| [#888](https://github.com/NVIDIA/NemoClaw/issues/888) | SSH handshake secret regenerated | Hardcode secret in helm template |
+| [#486](https://github.com/NVIDIA/NemoClaw/issues/486) | SSH secret mismatch after restart | **Fixed** in [#1587](https://github.com/NVIDIA/NemoClaw/issues/1587) (OpenShell#488). Older versions: hardcode secret |
+| — | Overlay filesystem wipe on restart | No upstream fix. Automated watchdog restore pattern |
 | [#759](https://github.com/NVIDIA/NemoClaw/issues/759) | openclaw.json unwritable | Rebuild required for config changes |
 
 ## Installation

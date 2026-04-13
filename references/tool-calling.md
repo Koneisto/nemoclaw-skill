@@ -90,6 +90,16 @@ OpenClaw (the base platform) requires models that support **structured function/
 
 **If tool calls are failing or producing malformed JSON**, check the inference backend first. The `--tool-call-parser` vLLM flag must match the model family — using the wrong parser silently corrupts tool call output.
 
+### Chat Template and Think-Block Interaction (SKILL.md Rule #15)
+
+The vLLM `--chat-template` flag critically affects tool calling for models that use thinking:
+
+- **Qwen3.5 MoE** (e.g., 35B-A3B): Requires `<think>\n\n</think>\n\n` injection at generation start or produces empty output. But this think-block puts the model in "text response mode" and **prevents tool call generation**. Tool calling is inherently unreliable with Qwen3.5.
+- **Qwen3 dense** (e.g., 32B): Does NOT require think-block. Use `/no_think` in the system prompt and no think injection. Tool calling works reliably.
+- The `qwen3_xml` tool parser correctly handles text before `<tool_call>` tags — the parser is not the problem when tool calling fails with Qwen3.5.
+
+When switching models, always verify: (1) chat template matches model's thinking requirements, (2) tool calling works end-to-end through OpenClaw, (3) session cache cleared after switch.
+
 ## Session Log: Tool Call Audit Trail
 
 Every tool call is recorded in the session log files at `/sandbox/.openclaw-data/agents/main/sessions/*.jsonl`. Each entry contains:

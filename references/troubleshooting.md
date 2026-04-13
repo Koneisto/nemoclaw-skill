@@ -82,8 +82,8 @@ This sets `"default-cgroupns-mode": "host"` in Docker daemon config.
 
 ## Post-Reboot Issues
 
-### Workspace wiped after reboot (NVIDIA/NemoClaw#486)
-**Cause**: Workspace lives on the pod's overlay filesystem, NOT a PVC. Every pod restart resets it to image defaults.
+### Workspace wiped after reboot
+**Cause**: Workspace lives on the pod's overlay filesystem, NOT a PVC. Every pod restart resets it to image defaults. This is separate from the SSH secret issue (NemoClaw#486, fixed in #1587) — overlay wipe has no upstream fix.
 **Symptoms**: Agent has no personality, re-introduces itself, doesn't know the user, default SOUL.md.
 **Fix**: Restore workspace from backup and reset sessions. For always-on deployments, use the watchdog auto-restore pattern — see `references/workspace-backup.md` "Automated Recovery" section.
 
@@ -121,14 +121,17 @@ NODE="${HOME}/.nvm/versions/node/v$(node -v | tr -d v)/bin/node"
 **Fix**: Delete after every upgrade, not just initial setup: `ssh sandbox "rm /sandbox/.openclaw-data/workspace/BOOTSTRAP.md"`. Also remove from backups.
 
 ### Cron jobs "disappeared" after restore
-**Cause**: Cron jobs are stored in `/sandbox/.openclaw-data/cron-jobs.json`. Restoring the file from backup puts the JSON back, but OpenClaw's cron scheduler only reads it at startup. Jobs won't fire until re-registered.
-**Fix**: After restoring `cron-jobs.json`, re-register each job via `openclaw cron add` — or restart the gateway process to force a reload. See `references/workspace-backup.md` Step 12.
+**Cause**: The gateway holds cron state in memory and **overwrites** `cron-jobs.json` with its in-memory state. File restore alone does nothing — the gateway doesn't read from the file on startup.
+**Fix**: Re-register each job via `openclaw cron add` with ALL fields (including `--announce --channel last`). Use a Python parser to extract fields from backup JSON — shell parsing loses delivery config. See SKILL.md rule #16 and `references/workspace-backup.md`.
 
 ## Runtime Issues
 
 ### SSH connection broken after reboot
-**Cause**: OpenShell regenerates `SSH_HANDSHAKE_SECRET` on every container restart (NemoClaw#888, OpenShell#487). See also SKILL.md rule #4.
-**Fix**: Hardcode the sandbox's secret in the container's helm template:
+**Cause**: OpenShell's `cluster-entrypoint.sh` generates a new random `SSH_HANDSHAKE_SECRET` on every container restart. The gateway pod picks up the new secret, but the Sandbox CRD retains the previous one → handshake verification fails. (NemoClaw#486, OpenShell#488). See also SKILL.md rule #4.
+
+**Upstream fix (NemoClaw#1587)**: The entrypoint now persists the secret to `/var/lib/rancher/k3s/server/ssh-secret.dat` and reuses it on subsequent starts. After upgrading past the fix, no manual workaround is needed. Confirmed no longer reproducible.
+
+**Workaround for older versions (pre-#1587)**: Hardcode the sandbox's secret in the container's helm template:
 ```bash
 # Enter the openshell cluster container:
 docker exec -it openshell-cluster-nemoclaw bash

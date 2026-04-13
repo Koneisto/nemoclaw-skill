@@ -100,7 +100,7 @@ In NemoClaw 0.1.0, the **watchdog script is the monitoring system**. There is no
 | Signal bridge | Bridge PID gone or orphaned | Kill orphans, restart bridge |
 | Dashboard bind | Bound to 127.0.0.1 instead of 0.0.0.0 | Stop and restart port forward |
 
-The watchdog runs via cron every minute. It is idempotent — running it when everything is healthy is a no-op. See `references/workspace-backup.md` for the full watchdog implementation and `references/koneisto-deployment.md` for a production deployment example.
+The watchdog runs via cron every minute. It is idempotent — running it when everything is healthy is a no-op. See `references/workspace-backup.md` for the full watchdog implementation.
 
 **Key insight:** The watchdog is both monitor and recovery mechanism. If the watchdog itself fails (e.g., cron not running, nvm PATH issue), everything downstream breaks silently. Monitor the watchdog's cron log as your meta-health check:
 

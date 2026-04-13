@@ -29,7 +29,7 @@ NemoClaw = OpenClaw (agent) + OpenShell (security: Landlock, seccomp, network na
 | NemoClaw | 0.1.0 (alpha) | 2026-04-10 |
 | OpenShell | 0.0.23 | 2026-04-10 |
 | OpenClaw | 2026.3.24 | 2026-04-10 |
-| This skill | Updated 2026-04-10 | Native skills, no MCP/Caddy, watchdog fixes, skill design rules |
+| This skill | Updated 2026-04-13 | 24 rules, #486 fix status (upstream #1587), tool calling model, chat template, cron restore, signal detection, TOOLS.md guidance |
 
 Upstream: `github.com/NVIDIA/NemoClaw` — check `git log origin/main` for new commits before major operations.
 
@@ -112,11 +112,13 @@ ssh sandbox "cat /sandbox/.openclaw-data/workspace/FILE.md" > local/FILE.md
 ssh sandbox "tar cf - -C /sandbox/.openclaw-data/workspace ." | tar xf - -C local/workspace/
 ```
 
-### 4. SSH Handshake Secret Bug (NemoClaw#888)
+### 4. SSH Handshake Secret Mismatch on Restart (NemoClaw#486)
 
-OpenShell regenerates `SSH_HANDSHAKE_SECRET` on every container restart, breaking SSH to existing sandboxes.
+OpenShell's `cluster-entrypoint.sh` generates a new random `SSH_HANDSHAKE_SECRET` from `/dev/urandom` on every container restart. The gateway pod picks up the new secret, but the Sandbox CRD retains the previous one → handshake verification fails → sandbox inaccessible.
 
-**Fix**: Hardcode the sandbox's secret in `/opt/openshell/manifests/openshell-helmchart.yaml` inside the `openshell-cluster-nemoclaw` container. This makes the entrypoint's `sed` a no-op.
+**Upstream fix**: Merged in NemoClaw#1587 (OpenShell#488). The entrypoint now persists the secret to `/var/lib/rancher/k3s/server/ssh-secret.dat` and reuses it on subsequent starts. After upgrading past OpenShell 0.0.23 / NemoClaw 0.1.0, no manual workaround is needed.
+
+**Workaround for older versions (pre-#1587)**: Hardcode the sandbox's secret in `/opt/openshell/manifests/openshell-helmchart.yaml` inside the `openshell-cluster-nemoclaw` container. This makes the entrypoint's `sed` a no-op.
 
 **NEVER** use `openshell gateway start --recreate` without being prepared to recreate all sandboxes.
 
@@ -150,7 +152,9 @@ OpenShell providers (credential entities) are bound at sandbox creation time. Yo
 
 ### 9. Workspace Is Ephemeral (Overlay, NOT PVC)
 
-Workspace files at `/sandbox/.openclaw-data/` live on the pod's **overlay filesystem**, NOT a Persistent Volume. They are **wiped on every pod restart** (reboot, crash, `openshell gateway start`). This is NVIDIA/NemoClaw#486 — no upstream fix as of April 2026.
+Workspace files at `/sandbox/.openclaw-data/` live on the pod's **overlay filesystem**, NOT a Persistent Volume. They are **wiped on every pod restart** (reboot, crash, `openshell gateway start`). No upstream PVC support exists as of April 2026.
+
+Note: NemoClaw#486 (SSH secret mismatch) is fixed upstream in #1587, but that fix only prevents the secret regeneration — it does NOT add persistent storage. Pod restarts from any cause still wipe the overlay.
 
 - **Wiped on restart**: Every pod restart resets the overlay to image defaults — all workspace files, skills, cron jobs, sessions, and memory notes are lost
 - **Wiped on `destroy`**: `nemoclaw <name> destroy` also deletes everything
@@ -340,11 +344,11 @@ To add files to the build context, either:
 | DGX Spark deployment | `references/dgx-spark.md` |
 | openclaw.json config reference | `references/openclaw-config.md` |
 | Memory, dreaming & session cleanup | `references/openclaw-config.md` (Plugin Configuration section) |
-| MCP servers (config, proxy, limitations) | `references/openclaw-config.md` (MCP section) |
+| MCP servers (config, proxy, limitations) | `references/tool-calling.md` (MCP note section) |
 | Tool calling model & OpenShell enforcement | `references/tool-calling.md` |
 | Access control & audit trail | `references/access-control.md` |
 | Monitoring & health checks | `references/monitoring.md` |
-| Real-world deployment example (Koneisto) | `references/koneisto-deployment.md` |
+| Real-world deployment example | `references/koneisto-deployment.md` (not included — create your own for deployment-specific details) |
 
 ## SSH Access to Sandbox
 
@@ -467,7 +471,7 @@ Before declaring any NemoClaw operation complete, verify:
 ### After Rebuild/Restart
 - [ ] Dashboard forwarded on **0.0.0.0** (watchdog auto-fixes within 1 min)
 - [ ] DNS proxy running: `bash scripts/setup-dns-proxy.sh nemoclaw <sandbox>`
-- [ ] SSH handshake secret hardcoded (if container was recreated)
+- [ ] SSH handshake secret persists (fixed in #1587; older versions: hardcode in helm template)
 - [ ] Workspace restored (all core .md files + SOUL.md references correct skill scripts)
 - [ ] Custom skills restored via SSH tar
 - [ ] BOOTSTRAP.md deleted from workspace
@@ -551,7 +555,8 @@ The gateway token also changes on rebuild — update any external systems that d
 |-------|--------|-----------|
 | llama.cpp grammar constraints vs tool call format | Tool calls fail or produce malformed JSON | Use Ollama or vLLM with `--tool-call-parser` flag matching model family |
 | Kernel 5.13+ required for Landlock | Landlock silently degrades on older kernels | Verify: `cat /sys/kernel/security/lsm` should include `landlock` |
-| Overlay filesystem wipe on restart (#486) | All workspace, skills, sessions lost | Automated watchdog restore (see `references/workspace-backup.md`) |
+| SSH secret mismatch on restart (#486) | SSH breaks after container restart | **Fixed** in #1587 (OpenShell#488). Older versions: hardcode secret in helm template |
+| Overlay filesystem wipe on restart | All workspace, skills, sessions lost on pod restart (no PVC) | Automated watchdog restore (see `references/workspace-backup.md`) |
 
 ## Key Constants
 

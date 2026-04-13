@@ -2,7 +2,7 @@
 
 ## Persistence Model
 
-**WARNING**: Workspace files are on the pod's **overlay filesystem**, NOT a Persistent Volume. They are **wiped on every pod restart** (reboot, crash, gateway restart). This is a known issue (NVIDIA/NemoClaw#486).
+**WARNING**: Workspace files are on the pod's **overlay filesystem**, NOT a Persistent Volume. They are **wiped on every pod restart** (reboot, crash, gateway restart). No upstream PVC support exists as of April 2026. Note: NemoClaw#486 (SSH secret mismatch) is fixed upstream in #1587, but that only prevents secret regeneration — it does NOT add persistent storage.
 
 - **Wiped on pod restart**: Every restart resets the overlay — workspace, skills, cron, sessions, memory notes all lost
 - **Wiped on `destroy`**: `nemoclaw <name> destroy` also deletes everything
@@ -236,12 +236,14 @@ openshell provider delete --gateway nemoclaw compatible-endpoint
 ### Step 12: Re-add Cron Jobs
 Add cron jobs via `openclaw cron add` (NOT by editing `cron-jobs.json` directly — the file format includes runtime state that `cron add` manages).
 
-### Step 13: Reset Sessions
+### Step 13: Reset Sessions (twice in watchdog)
 After restoring workspace files, clear all sessions so the agent re-reads the updated SOUL.md/USER.md:
 ```bash
 ssh sandbox "rm /sandbox/.openclaw-data/agents/main/sessions/sessions.json /sandbox/.openclaw-data/agents/main/sessions/*.jsonl 2>/dev/null"
 ```
 Without this, the agent uses cached system prompts from before the restore.
+
+**In a watchdog, clear sessions twice:** once during initial restore (Step 13), and again AFTER cron re-registration (Step 12). The gateway creates a stale skill snapshot between restores, and the second clear ensures the agent picks up the final state.
 
 ### Step 14: Start Services
 ```bash
@@ -257,7 +259,7 @@ cd ~/.nemoclaw/source && ./scripts/start-services.sh
 | Missing DNS proxy | `web_fetch` fails with `EAI_AGAIN` | Run `setup-dns-proxy.sh` after every rebuild |
 | `openclaw.json` read-only | Landlock prevents modification at runtime | Changes require full sandbox rebuild |
 | Gateway token changes on rebuild | External systems using token break | Update any token references after rebuild |
-| SSH handshake secret regeneration | SSH breaks on container restart (NemoClaw#888) | Hardcode secret in helm template |
+| SSH handshake secret regeneration | SSH breaks on container restart (NemoClaw#486) | **Fixed** upstream in #1587. Older versions: hardcode secret in helm template |
 | Editing `cron-jobs.json` directly | Runtime state corrupted | Always use `openclaw cron add` |
 | Forgetting memory directory | Daily notes lost | Create `memory/` dir explicitly, then restore tar |
 | Not verifying after restore | Silent failures go unnoticed | Connect to sandbox and `ls` workspace after restore |
@@ -306,7 +308,13 @@ Cron (every minute)
       8. Re-register cron jobs via `openclaw cron add` (file alone is NOT enough — gateway doesn't load from file)
 ```
 
-**CRITICAL: Cron job re-registration.** Restoring `cron-jobs.json` to the filesystem is not sufficient. The OpenClaw gateway maintains its own in-memory cron state and does NOT read from the file on startup. Cron jobs must be re-added via `openclaw cron add` after every restore. The watchdog (step 0.7) handles this automatically by parsing `cron-jobs.json` from backup and calling `openclaw cron add` for each job.
+**CRITICAL: Cron job re-registration (SKILL.md rule #16).** Restoring `cron-jobs.json` to the filesystem is not sufficient. The OpenClaw gateway holds cron state in memory and **overwrites the file** with its in-memory state. After restore:
+
+1. Copy the file (for completeness)
+2. Re-register each job via `openclaw cron add` with ALL fields including `--announce --channel last`
+3. Use a Python parser to extract all fields from the backup JSON — shell parsing loses delivery config
+
+The watchdog handles this automatically by parsing `cron-jobs.json` from backup and calling `openclaw cron add` for each job.
 
 ### Key Design Decisions
 

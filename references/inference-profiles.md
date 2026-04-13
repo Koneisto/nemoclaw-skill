@@ -100,6 +100,7 @@ openshell inference set --provider compatible-anthropic-endpoint --model <model-
 - The sandbox continues using `inference.local`
 - You CAN switch between models within the same provider (e.g., `gpt-5.4` → `gpt-5`) and between already-configured providers (e.g., `nvidia-prod` → `openai-api` if both were set up during onboard)
 - If you need to **add a new provider type** (one not configured during onboard), re-run `nemoclaw onboard`
+- **Chat template must match model** — especially for tool calling. See `references/tool-calling.md` "Chat Template and Think-Block Interaction" and SKILL.md rule #15. Qwen3.5 MoE has inherent tool calling limitations due to think-block requirements.
 - Verify after switching: `nemoclaw <name> status`
 
 ## Model Fallbacks
