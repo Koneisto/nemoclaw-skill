@@ -1,3 +1,9 @@
+## Maintenance status
+
+This project is no longer maintained.
+
+The repository is preserved for reference. No further updates, bug fixes, or security patches are planned.
+
 ![NemoClaw Skill](social-preview.png)
 
 A comprehensive [Claude Code](https://claude.ai/code) skill for managing [NVIDIA NemoClaw](https://github.com/NVIDIA/NemoClaw) sandboxed AI agents from the host side.
